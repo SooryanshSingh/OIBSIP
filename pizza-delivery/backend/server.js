@@ -43,3 +43,34 @@ app.get(
         });
     }
 );
+const pizzaBaseRoutes =
+    require("./routes/pizzaBaseRoutes");
+
+
+app.use("/api/bases", pizzaBaseRoutes);
+
+
+const sauceRoutes =
+    require("./routes/sauceRoutes");
+
+
+
+app.use("/api/sauces", sauceRoutes);
+
+const cheeseRoutes =
+    require("./routes/cheeseRoutes");
+
+
+
+app.use("/api/cheeses", cheeseRoutes);
+
+const toppingRoutes =
+    require("./routes/toppingRoutes");
+app.use("/api/toppings", toppingRoutes);
+
+const orderRoutes =
+    require("./routes/orderRoutes");
+
+Add:
+
+app.use("/api/orders", orderRoutes);
