@@ -3,10 +3,81 @@ const PizzaBase = require("../models/PizzaBase");
 const Sauce = require("../models/Sauce");
 const Cheese = require("../models/Cheese");
 const Topping = require("../models/Topping");
+const nodemailer = require("nodemailer");
+
+const sendAlert = async (type, name, qty) => {
+    try {
+        if (!process.env.ADMIN_EMAIL) {
+            console.log("ADMIN_EMAIL not set");
+            return;
+        }
+
+        const mailer = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        await mailer.sendMail({
+            from: process.env.EMAIL_USER,
+            to: process.env.ADMIN_EMAIL,
+            subject: "Low Stock Alert",
+            html: `
+                <h2>Low Stock Alert</h2>
+                <p><strong>Type:</strong> ${type}</p>
+                <p><strong>Name:</strong> ${name}</p>
+                <p><strong>Stock:</strong> ${qty}</p>
+                <p>Please restock this item soon.</p>
+            `
+        });
+
+        console.log("Low stock mail sent:", name);
+
+    } catch (err) {
+        console.log("Low stock mail error:", err);
+    }
+};
+
+const checkStock = async (b, s, c, tops) => {
+    if (b.stock === 19) {
+        await sendAlert(
+            "Base",
+            b.name,
+            b.stock
+        );
+    }
+
+    if (s.stock === 19) {
+        await sendAlert(
+            "Sauce",
+            s.name,
+            s.stock
+        );
+    }
+
+    if (c.stock === 19) {
+        await sendAlert(
+            "Cheese",
+            c.name,
+            c.stock
+        );
+    }
+
+    for (const t of tops) {
+        if (t.stock === 19) {
+            await sendAlert(
+                "Topping",
+                t.name,
+                t.stock
+            );
+        }
+    }
+};
 
 const placeOrder = async (req, res) => {
     try {
-
         const {
             base,
             sauce,
@@ -14,81 +85,78 @@ const placeOrder = async (req, res) => {
             toppings
         } = req.body;
 
-        const selectedBase =
-            await PizzaBase.findById(base);
+        const b = await PizzaBase.findById(base);
+        const s = await Sauce.findById(sauce);
+        const c = await Cheese.findById(cheese);
 
-        const selectedSauce =
-            await Sauce.findById(sauce);
+        const tops = await Topping.find({
+            _id: { $in: toppings }
+        });
 
-        const selectedCheese =
-            await Cheese.findById(cheese);
-
-        const selectedToppings =
-            await Topping.find({
-                _id: { $in: toppings }
-            });
-
-        if (
-            !selectedBase ||
-            !selectedSauce ||
-            !selectedCheese
-        ) {
+        if (!b || !s || !c) {
             return res.status(400).json({
                 message: "Invalid pizza configuration"
             });
         }
 
-        if (selectedBase.stock <= 0) {
+        if (b.stock <= 0) {
             return res.status(400).json({
                 message: "Base out of stock"
             });
         }
 
-        if (selectedSauce.stock <= 0) {
+        if (s.stock <= 0) {
             return res.status(400).json({
                 message: "Sauce out of stock"
             });
         }
 
-        if (selectedCheese.stock <= 0) {
+        if (c.stock <= 0) {
             return res.status(400).json({
                 message: "Cheese out of stock"
             });
         }
 
-        for (const topping of selectedToppings) {
-            if (topping.stock <= 0) {
+        for (const t of tops) {
+            if (t.stock <= 0) {
                 return res.status(400).json({
-                    message: `${topping.name} out of stock`
+                    message: `${t.name} out of stock`
                 });
             }
         }
 
         let totalPrice = 0;
 
-        totalPrice += selectedBase.price;
-        totalPrice += selectedSauce.price;
-        totalPrice += selectedCheese.price;
+        totalPrice += b.price;
+        totalPrice += s.price;
+        totalPrice += c.price;
 
-        selectedToppings.forEach((topping) => {
-            totalPrice += topping.price;
+        tops.forEach((t) => {
+            totalPrice += t.price;
         });
 
-        selectedBase.stock--;
-        selectedSauce.stock--;
-        selectedCheese.stock--;
+        b.stock--;
+        s.stock--;
+        c.stock--;
 
-        for (const topping of selectedToppings) {
-            topping.stock--;
+        for (const t of tops) {
+            t.stock--;
         }
 
-        await selectedBase.save();
-        await selectedSauce.save();
-        await selectedCheese.save();
+        await b.save();
+        await s.save();
+        await c.save();
 
-        for (const topping of selectedToppings) {
-            await topping.save();
+        for (const t of tops) {
+            await t.save();
         }
+
+        await checkStock(
+            b,
+            s,
+            c,
+            tops
+        );
 
         const order = await Order.create({
             user: req.user._id,
@@ -101,9 +169,8 @@ const placeOrder = async (req, res) => {
 
         res.status(201).json(order);
 
-    } catch (error) {
-
-        console.log(error);
+    } catch (err) {
+        console.log(err);
 
         res.status(500).json({
             message: "Server error"
@@ -113,7 +180,6 @@ const placeOrder = async (req, res) => {
 
 const getMyOrders = async (req, res) => {
     try {
-
         const orders = await Order.find({
             user: req.user._id
         })
@@ -124,18 +190,15 @@ const getMyOrders = async (req, res) => {
 
         res.json(orders);
 
-    } catch (error) {
-
+    } catch (err) {
         res.status(500).json({
             message: "Server error"
         });
     }
 };
 
-
 const getAllOrders = async (req, res) => {
     try {
-
         const orders = await Order.find()
             .populate("user", "name email")
             .populate("base")
@@ -145,9 +208,8 @@ const getAllOrders = async (req, res) => {
 
         res.status(200).json(orders);
 
-    } catch (error) {
-
-        console.log(error);
+    } catch (err) {
+        console.log(err);
 
         res.status(500).json({
             message: "Server error"
@@ -155,10 +217,8 @@ const getAllOrders = async (req, res) => {
     }
 };
 
-
 const updateOrderStatus = async (req, res) => {
     try {
-
         const { status } = req.body;
 
         const order = await Order.findById(
@@ -180,18 +240,17 @@ const updateOrderStatus = async (req, res) => {
             order
         });
 
-    } catch (error) {
-
-        console.log(error);
+    } catch (err) {
+        console.log(err);
 
         res.status(500).json({
             message: "Server error"
         });
     }
 };
+
 const markOrderPaid = async (req, res) => {
     try {
-
         const order = await Order.findById(
             req.params.id
         );
@@ -211,9 +270,8 @@ const markOrderPaid = async (req, res) => {
             order
         });
 
-    } catch (error) {
-
-        console.log(error);
+    } catch (err) {
+        console.log(err);
 
         res.status(500).json({
             message: "Server error"
