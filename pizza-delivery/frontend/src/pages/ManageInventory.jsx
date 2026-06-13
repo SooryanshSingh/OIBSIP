@@ -425,10 +425,7 @@ if (!user?.isAdmin) {
             <h1>Manage Inventory</h1>
 	<h2>Add Base</h2>
 
-	<input
-	    placeholder="Name"
-	    value={baseForm.name}
-	    onChange={(e) =>
+	<input placeholder="Name" value={baseForm.name} onChange={(e) =>
 		setBaseForm({
 		    ...baseForm,
 		    name: e.target.value

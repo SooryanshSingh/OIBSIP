@@ -96,12 +96,13 @@ function Home() {
     return (
         <div className="page">
             <h1>Build Your Pizza</h1>
+            <h1> By Sooryansh Singh </h1>
 
             <h2>Bases</h2>
 
             {bases.map((x) => (
                 <div key={x._id}>
-                    <inputtype="radio" name="base" value={x._id} checked={base === x._id} disabled={x.stock <= 0} onChange={() => setBase(x._id)}/>
+                    <input type="radio" name="base" value={x._id} checked={base === x._id} disabled={x.stock <= 0} onChange={() => setBase(x._id)}/>
 
                     {x.name} - ₹{x.price}{" "}
                     {x.stock <= 0 ? (
